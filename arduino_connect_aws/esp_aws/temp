@@ -1,1 +1,55 @@
-a
+#include <Arduino_BuiltIn.h>
+#include "utils.h"
+#include <PubSubClient.h>
+
+// הגדרות חיישן זרימה
+const byte sensorPin = 34; 
+volatile long pulseCount = 0;
+float flowRate = 0.0;
+unsigned int flowMilliLitres = 0;
+unsigned long totalMilliLitres = 0;
+unsigned long oldTime = 0;
+
+// פונקציית ה-Interrupt שרצה בכל פולס
+void IRAM_ATTR pulseCounter() {
+  pulseCount++;
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    // הגדרת פין 34 כקלט (זכור: אין לו Pull-up פנימי)
+    pinMode(sensorPin, INPUT);
+    attachInterrupt(digitalPinToInterrupt(sensorPin), pulseCounter, RISING);
+    
+    connectAWS();
+    oldTime = millis();
+}
+
+void loop() {
+  // בדיקה וחישוב בכל שנייה
+  if ((millis() - oldTime) > 1000) {
+    
+    // עצירת אינטראפט לזמן החישוב
+    detachInterrupt(digitalPinToInterrupt(sensorPin));
+    
+    // חישוב קצב זרימה (לפי היחס של 14.5 שסיפקת)
+    flowRate = ((1000.0 / (millis() - oldTime)) * pulseCount) / 14.5;
+    oldTime = millis();
+    
+    flowMilliLitres = (flowRate / 60) * 1000;
+    totalMilliLitres += flowMilliLitres;
+    
+    // הדפסה למסך הסריאלי
+    Serial.printf("Flow rate: %.2f L/min | Total: %lu mL\n", flowRate, totalMilliLitres);
+
+    // שליחת הנתונים האמיתיים ל-AWS
+    publishMessage(flowRate, totalMilliLitres);
+
+    // איפוס מונה והחזרת האינטראפט
+    pulseCount = 0;
+    attachInterrupt(digitalPinToInterrupt(sensorPin), pulseCounter, RISING);
+  }
+
+  client.loop(); // חשוב מאוד לשמור על החיבור ל-AWS חי
+}
