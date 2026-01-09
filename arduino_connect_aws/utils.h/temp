@@ -34,9 +34,9 @@ void connectAWS() {
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
   client.setServer(AWS_IOT_ENDPOINT, 8883); //הגדרת כתובת השרת של אמזון ופורט 8883 (הפורט המאובטח).
-  client.setCallback(messageHandler);
-  Serial.println("Connecting to AWS IOT");
-  while (!client.connect(THINGNAME)) {
+  client.setCallback(messageHandler);  //הפרוטוקל אומר שכשמגיעה הודעה תפעיל את הפונקציה שכתבנו למעלה
+  Serial.println("Connecting to AWS IOT"); 
+  while (!client.connect(THINGNAME)) {   //כל עוד החיבור לברוקר לא מתרחש הוא ימשיך לנסות
     Serial.print(".");
     delay(100);
   }
@@ -44,17 +44,17 @@ void connectAWS() {
     Serial.println("AWS IoT Timeout!");
     return;
   }
-  client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
+  client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);  //ברגע שהתחברנו, אנחנו נרשמים לערוץ ההאזנה כדי לקבל הודעות.
   Serial.println("AWS IoT Connected!");
 }
 
-// פונקציה מעודכנת לקבלת נתוני זרימה
-void publishMessage(float flowRate, unsigned long totalMilliLitres) {
-  StaticJsonDocument<200> doc;
-  doc["flow_rate"] = flowRate;
-  doc["total_ml"] = totalMilliLitres;
+// זו הפונקציה שמעבירה את נתוני החיישן לענן
+void publishMessage(float flowRate, unsigned long totalMilliLitres) {    //מקבלת את קצב הזרימה ואת הסך הכללי שחישבנו ב בלופ
+  StaticJsonDocument<200> doc;    //יצירת מסמך גייסון חדש
+  doc["flow_rate"] = flowRate; //הוספת הנתון לתוך הגייסון
+  doc["total_ml"] = totalMilliLitres; 
 
-  char jsonBuffer[512];
-  serializeJson(doc, jsonBuffer);
-  client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer);
+  char jsonBuffer[512]; //יצירת באפר (מקום אחסון זמני) למחרוזת הטקסט שתיווצר
+  serializeJson(doc, jsonBuffer);   //הפיכת אובייקט הגייסון למחרוזת טקסט ארוכה
+  client.publish(AWS_IOT_PUBLISH_TOPIC, jsonBuffer); //שליחת מחרוזת הטקסט הזו לענן
 }
