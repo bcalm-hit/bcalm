@@ -1,37 +1,39 @@
 #include <Arduino_BuiltIn.h>
-#include "certs.h"
-#include <WiFiClientSecure.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
-#include "WiFi.h"
+#include "certs.h" //יבוא קובץ הסיסמאות
+#include <WiFiClientSecure.h> //מאפשרת תקשורת אינטרנט מוצפנת
+#include <PubSubClient.h> //הספרייה שמנהלת את פרוטוקול MQTT (שליחה וקבלת הודעות).
+#include <ArduinoJson.h> //מאפשרת ליצור ולקרוא קבצי JSON (הפורמט שבו המידע נשלח לענן).
+#include "WiFi.h"  //הספרייה שמאפשרת  להתחבר פיזית לראוטר שלך.
 
-#define AWS_IOT_PUBLISH_TOPIC   "esp32/pub"
-#define AWS_IOT_SUBSCRIBE_TOPIC "esp32/sub"
+#define AWS_IOT_PUBLISH_TOPIC   "esp32/pub"   //הגדרת "כתובת המשלוח" בענן. כאן המכשיר יפרסם את נתוני הזרימה.
+#define AWS_IOT_SUBSCRIBE_TOPIC "esp32/sub"   //הגדרת "כתובת האזנה" בענן. כאן המכשיר יקבל מהשרת פקודות .
 
-WiFiClientSecure net = WiFiClientSecure();
-PubSubClient client(net);
+WiFiClientSecure net = WiFiClientSecure();  //יצירת "לקוח" אינטרנט מאובטח. זהו הצינור שדרכו המידע יעבור בצורה מוצפנת.
+PubSubClient client(net);  //יצירת לקוח MQTT שיושב "בתוך" הצינור המאובטח שפתחנו בשורה הקודמת.
 
-void messageHandler(char* topic, byte* payload, unsigned int length) {
+void messageHandler(char* topic, byte* payload, unsigned int length) {   //זו הפונקציה שפועלת כשמישהו שולח הודעה מהשרת למכשיר
+//מגדירה שהפונקציה מקבלת את שם הנושא, תוכן ההודעה ואורכה.
   Serial.print("incoming: ");
   Serial.println(topic);
-  StaticJsonDocument<200> doc;
-  deserializeJson(doc, payload);
-  const char* message = doc["message"];
+  StaticJsonDocument<200> doc;  //יצירת מקום בזיכרון לקריאת ה-JSON הנכנס
+  deserializeJson(doc, payload);  //פעולת "פריקה" – הופכת את רצף הביטים מהאינטרנט לאובייקט שאפשר לקרוא.
+  const char* message = doc["message"]; //חילוץ הטקסט שנמצא תחת המפתח "message" בתוך ה-JSON.
   Serial.println(message);
 }
 
 void connectAWS() {
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.println("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED){
+  WiFi.mode(WIFI_STA);  // הגדרת המכשירה כ"תחנה" שמתחברת לראוטר (ולא כנקודת גישה בעצמו)
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD); //פקודת ההתחברות לוויפי עם הפרטים מהתעודות
+  Serial.println("Connecting to Wi-Fi");  
+  while (WiFi.status() != WL_CONNECTED){   //לולאה ש"תוקעת" את הקוד עד שיש חיבור אינטרנט תקין.
     delay(500);
     Serial.print(".");
   }
+  //טעינת תעודות האבטחה לתוך הלקוח המאובטח. זהו שלב ה"זיהוי" מול אמזון.
   net.setCACert(AWS_CERT_CA);
   net.setCertificate(AWS_CERT_CRT);
   net.setPrivateKey(AWS_CERT_PRIVATE);
-  client.setServer(AWS_IOT_ENDPOINT, 8883);
+  client.setServer(AWS_IOT_ENDPOINT, 8883); //הגדרת כתובת השרת של אמזון ופורט 8883 (הפורט המאובטח).
   client.setCallback(messageHandler);
   Serial.println("Connecting to AWS IOT");
   while (!client.connect(THINGNAME)) {
